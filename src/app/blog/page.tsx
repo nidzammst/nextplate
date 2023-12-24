@@ -9,6 +9,7 @@ import PostSidebar from "@/partials/PostSidebar";
 import SeoMeta from "@/partials/SeoMeta";
 import { Post } from "@/types";
 const { blog_folder, pagination } = config.settings;
+import { fetchPages } from "@/lib/notion";
 
 // for all regular pages
 const Posts = () => {
@@ -21,6 +22,9 @@ const Posts = () => {
   const sortedPosts = sortByDate(posts);
   const totalPages = Math.ceil(posts.length / pagination);
   const currentPosts = sortedPosts.slice(0, pagination);
+
+  const totalPages = Math.ceil(60 / pagination);
+  const articles = await fetchPages();
 
   return (
     <>
@@ -36,7 +40,7 @@ const Posts = () => {
           <div className="row gx-5">
             <div className="lg:col-8">
               <div className="row">
-                {currentPosts.map((post: any, index: number) => (
+                {articles.results.map((post: any, index: number) => (
                   <div key={index} className="mb-14 md:col-6">
                     <BlogCard data={post} />
                   </div>

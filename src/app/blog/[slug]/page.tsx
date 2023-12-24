@@ -16,6 +16,13 @@ import {
   FaRegFolder,
   FaRegUserCircle,
 } from "react-icons/fa/index.js";
+import { getSinglePost, getAuthorById } from "@/lib/actions";
+import { fetchPageBySlug, fetchPageBlocks, notion } from "@/lib/notion";
+import bookmarkPlugin from "@notion-render/bookmark-plugin";
+import { NotionRenderer } from "@notion-render/client";
+import hljsPlugin from "@notion-render/hljs-plugin";
+import { notFound } from "next/navigation";
+import { HighlightOptions } from "highlight.js";
 
 const { blog_folder } = config.settings;
 
@@ -33,90 +40,108 @@ export const generateStaticParams: () => { single: string }[] = () => {
   return paths;
 };
 
-const PostSingle = ({ params }: { params: { single: string } }) => {
-  const posts: Post[] = getSinglePage(blog_folder);
-  const post = posts.filter((page) => page.slug === params.single)[0];
+const PostSingle = async ({ params }: { params: { slug: string } }) => {
+  const post = await fetchPageBySlug(params.slug);
+  console.log(params)
+  if (!post) notFound();
 
-  const { frontmatter, content } = post;
-  const {
-    title,
-    meta_title,
-    description,
-    image,
-    author,
-    categories,
-    date,
-    tags,
-  } = frontmatter;
-  const similarPosts = similerItems(post, posts, post.slug!);
+  const blocks = await fetchPageBlocks(post.id);
+
+  const renderer = new NotionRenderer({
+    client: notion,
+  });
+
+  const highlightOptions: HighlightOptions = {
+    language: 'typescript',
+    ignoreIllegals: true,  // Ini opsional, sesuai dengan definisi antarmuka
+  };
+  renderer.use(hljsPlugin(highlightOptions));
+  renderer.use(bookmarkPlugin(undefined));
+  const html = await renderer.render(...blocks);
+
+  const { title, summary, category, tags, created_at, author } =
+    post.properties;
+  const cover_url = post.cover?.external?.url || post.cover?.file?.url;
+  const getTitle = title.title.map((title) => {
+    return title.plain_text;
+  });
+
+  const newAuthor = author.people[0];
 
   return (
     <>
-      <SeoMeta
-        title={title}
-        meta_title={meta_title}
-        description={description}
-        image={image}
-      />
+      {/*<SeoMeta
+        title={getTitle[0]}
+        meta_title={getTitle[0]}
+        description={summary}
+        image={cover_url}
+      />*/}
       <section className="section pt-7">
         <div className="container">
           <div className="row justify-center">
             <article className="lg:col-10">
-              {image && (
+              {cover_url && (
                 <div className="mb-10">
                   <ImageFallback
-                    src={image}
+                    src={cover_url}
                     height={500}
                     width={1200}
-                    alt={title}
+                    alt={getTitle[0]}
                     className="w-full rounded"
                   />
                 </div>
               )}
               <h1
-                dangerouslySetInnerHTML={markdownify(title)}
+                dangerouslySetInnerHTML={markdownify(getTitle[0])}
                 className="h2 mb-4"
               />
               <ul className="mb-4">
                 <li className="mr-4 inline-block">
-                  <Link href={`/authors/${slugify(author)}`}>
+                  <a href={`/authors/${slugify(post.created_by.id)}`}>
                     <FaRegUserCircle className={"-mt-1 mr-2 inline-block"} />
-                    {humanize(author)}
-                  </Link>
+                    {newAuthor?.name
+                      ? `${humanize(newAuthor?.name)}`
+                      : "Author"}
+                  </a>
                 </li>
                 <li className="mr-4 inline-block">
                   <FaRegFolder className={"-mt-1 mr-2 inline-block"} />
-                  {categories?.map((category: string, index: number) => (
-                    <Link
-                      key={category}
-                      href={`/categories/${slugify(category)}`}
-                    >
-                      {humanize(category)}
-                      {index !== categories.length - 1 && ", "}
-                    </Link>
-                  ))}
+                  {category?.multi_select.length > 0
+                    ? category?.multi_select?.map(
+                        (category: string, index: number) => (
+                          <Link
+                            key={category.id}
+                            href={`/categories/${slugify(category.id)}`}
+                          >
+                            {humanize(category.name)}
+                            {index !== category.length - 1 && ", "}
+                          </Link>
+                        ),
+                      )
+                    : "category"}
                 </li>
-                {date && (
+                {created_at.created_time && (
                   <li className="mr-4 inline-block">
                     <FaRegClock className="-mt-1 mr-2 inline-block" />
-                    {dateFormat(date)}
+                    {dateFormat(created_at.created_time)}
                   </li>
                 )}
               </ul>
               <div className="content mb-10">
-                <MDXContent content={content} />
+                <div dangerouslySetInnerHTML={{ __html: html }}></div>;
+                {/*<MDXContent content={content_text} />*/}
               </div>
               <div className="row items-start justify-between">
                 <div className="mb-10 flex items-center lg:col-5 lg:mb-0">
-                  <h5 className="mr-3">Tags :</h5>
+                  <h5 className="mr-3">Tags:</h5>
                   <ul>
-                    {tags?.map((tag: string) => (
-                      <li key={tag} className="inline-block">
+                    {tags?.multi_select?.map((tag: string) => (
+                      <li key={tag.id} className="inline-block">
                         <Link
                           className="m-1 block rounded bg-theme-light px-3 py-1 hover:bg-primary hover:text-white dark:bg-darkmode-theme-light dark:hover:bg-darkmode-primary dark:hover:text-dark"
-                          href={`/tags/${slugify(tag)}`}
+                          href={`/tags/${slugify(tag.id)}`}
                         >
-                          {humanize(tag)}
+                          {humanize(tag.name)}
                         </Link>
                       </li>
                     ))}
@@ -127,8 +152,8 @@ const PostSingle = ({ params }: { params: { single: string } }) => {
                   <Share
                     className="social-icons"
                     title={title}
-                    description={description}
-                    slug={post.slug!}
+                    description={summary}
+                    slug={params.single}
                   />
                 </div>
               </div>
@@ -137,7 +162,7 @@ const PostSingle = ({ params }: { params: { single: string } }) => {
           </div>
 
           {/* <!-- Related posts --> */}
-          <div className="section pb-0">
+          {/*<div className="section pb-0">
             <h2 className="h3 mb-12 text-center">Related Posts</h2>
             <div className="row justify-center">
               {similarPosts.map((post) => (
@@ -146,7 +171,7 @@ const PostSingle = ({ params }: { params: { single: string } }) => {
                 </div>
               ))}
             </div>
-          </div>
+          </div>*/}
         </div>
       </section>
     </>
