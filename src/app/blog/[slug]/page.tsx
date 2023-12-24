@@ -40,7 +40,7 @@ export const generateStaticParams: () => { single: string }[] = () => {
   return paths;
 };
 
-const PostSingle = async ({ params }: { params: { slug: string } }) => {
+const page = async ({ params }: { params: { slug: string } }) => {
   const post = await fetchPageBySlug(params.slug);
   console.log(params)
   if (!post) notFound();
@@ -178,4 +178,4 @@ const PostSingle = async ({ params }: { params: { slug: string } }) => {
   );
 };
 
-export default PostSingle;
+export default page;
