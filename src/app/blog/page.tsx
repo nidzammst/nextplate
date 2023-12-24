@@ -12,7 +12,7 @@ const { blog_folder, pagination } = config.settings;
 import { fetchPages } from "@/lib/notion";
 
 // for all regular pages
-const Posts = () => {
+const Posts = async () => {
   const postIndex: Post = getListPage(`${blog_folder}/_index.md`);
   const { title, meta_title, description, image } = postIndex.frontmatter;
   const posts: Post[] = getSinglePage(blog_folder);
