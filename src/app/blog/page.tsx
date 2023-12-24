@@ -20,7 +20,6 @@ const Posts = async () => {
   const categories = getTaxonomy(blog_folder, "categories");
   const tags = getTaxonomy(blog_folder, "tags");
   const sortedPosts = sortByDate(posts);
-  const totalPages = Math.ceil(posts.length / pagination);
   const currentPosts = sortedPosts.slice(0, pagination);
 
   const totalPages = Math.ceil(60 / pagination);
